@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude · Model Timeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #0f0f18;
+    --surface: #14141f;
+    --border: #1e1e2e;
+    --text: #e8e6f0;
+    --muted: #6b6880;
+    --accent-orange: #ff7043;
+    --accent-gold: #f5c842;
+    --accent-teal: #26c6a0;
+    --accent-blue: #5c9cf5;
+    --accent-purple: #9b6dff;
+    --accent-pink: #e85d9b;
+    --accent-spec: #7dd3b0;
+    --line: #2a2a3e;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* Header */
+  header {
+    padding: 64px 0 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent-teal);
+    font-weight: 400;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(38px, 6vw, 62px);
+    font-weight: 700;
+    line-height: 1.05;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent-gold);
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 300;
+    margin-top: 4px;
+    max-width: 420px;
+    line-height: 1.6;
+  }
+
+  /* Year dividers */
+  .year-block {
+    margin-bottom: 6px;
+  }
+
+  .year-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 20px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .year-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  /* Timeline entries */
+  .entry {
+    display: grid;
+    grid-template-columns: 100px 1px 1fr;
+    gap: 0 28px;
+    padding: 12px 0;
+    position: relative;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .entry.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  .entry-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    padding-top: 20px;
+    text-align: right;
+    line-height: 1.4;
+    font-weight: 300;
+  }
+
+  .entry-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+
+  .entry-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dot-color, var(--muted));
+    margin-top: 23px;
+    flex-shrink: 0;
+    box-shadow: 0 0 12px var(--dot-color, transparent);
+    position: relative;
+    z-index: 1;
+  }
+
+  .entry-connector {
+    width: 1px;
+    flex: 1;
+    background: var(--line);
+    margin-top: 4px;
+  }
+
+  .entry:last-child .entry-connector {
+    display: none;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    cursor: default;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--dot-color, var(--muted));
+    opacity: 0.7;
+  }
+
+  .card:hover {
+    border-color: var(--dot-color, var(--border));
+    transform: translateX(3px);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .model-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: var(--dot-color, var(--muted));
+    border: 1px solid rgba(255,255,255,0.07);
+    font-weight: 400;
+  }
+
+  .milestone-badge {
+    background: rgba(245, 200, 66, 0.1);
+    color: var(--accent-gold);
+    border-color: rgba(245, 200, 66, 0.2);
+  }
+
+  .card-desc {
+    font-size: 14px;
+    color: #9894a8;
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-weight: 300;
+  }
+
+  /* Speculative section divider */
+  .spec-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 8px 0 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #7dd3b0;
+    opacity: 0.7;
+  }
+  .spec-divider::before, .spec-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, #2a2a3e 0px, #2a2a3e 6px, transparent 6px, transparent 12px);
+  }
+
+  .card.speculative {
+    background: rgba(20,20,31,0.5);
+    border-style: dashed;
+    border-color: rgba(125, 211, 176, 0.2);
+    opacity: 0.82;
+  }
+  .card.speculative::before {
+    background: repeating-linear-gradient(180deg, rgba(125,211,176,0.5) 0px, rgba(125,211,176,0.5) 5px, transparent 5px, transparent 10px);
+    opacity: 0.6;
+  }
+  .card.speculative:hover {
+    border-color: rgba(125, 211, 176, 0.4);
+    transform: translateX(3px);
+  }
+
+  .spec-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: rgba(125, 211, 176, 0.08);
+    color: #7dd3b0;
+    border: 1px dashed rgba(125, 211, 176, 0.25);
+  }
+
+  .confidence {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  .conf-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: rgba(125, 211, 176, 0.2);
+  }
+  .conf-dot.filled { background: rgba(125, 211, 176, 0.65); }
+  .conf-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+
+  /* Present marker */
+  .present-marker {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 0 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-teal);
+  }
+
+  .present-marker::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-teal);
+    box-shadow: 0 0 10px var(--accent-teal);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 600px) {
+    .entry { grid-template-columns: 72px 1px 1fr; gap: 0 16px; }
+    .entry-date { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="eyebrow">Anthropic · Model History</div>
+    <h1>The <em>Claude</em><br>Timeline</h1>
+    <p class="subtitle">Every major release from the first private beta to the present day, March 2026.</p>
+  </header>
+
+  <!-- 2023 -->
+  <div class="year-block">
+    <div class="year-label">2023</div>
+
+    <div class="entry" style="--dot-color: var(--accent-orange)">
+      <div class="entry-date">Mar<br>2023</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-orange)">
+        <div class="card-header">
+          <span class="model-name">Claude 1</span>
+          <span class="badge">Private Beta</span>
+          <span class="badge milestone-badge">★ First Release</span>
+        </div>
+        <p class="card-desc">The very first Claude model, available only to select users approved by Anthropic. Built around Constitutional AI principles — a novel training approach designed to produce helpful, harmless, and honest responses without relying on extensive human feedback alone.</p>
+        <div class="tags"><span class="tag">Constitutional AI</span><span class="tag">Selected access</span><span class="tag">100K context</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-orange)">
+      <div class="entry-date">Jul<br>2023</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-orange)">
+        <div class="card-header">
+          <span class="model-name">Claude 2</span>
+          <span class="badge">Public Launch</span>
+          <span class="badge milestone-badge">★ First Public Model</span>
+        </div>
+        <p class="card-desc">The first Claude model available to the general public. Brought a major context window jump — up to 100K tokens — enabling Claude to read entire codebases or lengthy documents in a single prompt. Significant improvements in reasoning and coding over Claude 1.</p>
+        <div class="tags"><span class="tag">100K context</span><span class="tag">General availability</span><span class="tag">Improved coding</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-orange)">
+      <div class="entry-date">Nov<br>2023</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-orange)">
+        <div class="card-header">
+          <span class="model-name">Claude 2.1</span>
+          <span class="badge">Update</span>
+        </div>
+        <p class="card-desc">Doubled the context window to 200K tokens — roughly 500 pages of text — making Claude 2.1 one of the longest-context models available at the time. Reduced hallucination rates and improved ability to follow complex, multi-step instructions.</p>
+        <div class="tags"><span class="tag">200K context</span><span class="tag">Reduced hallucinations</span><span class="tag">~500 pages</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2024 -->
+  <div class="year-block">
+    <div class="year-label">2024</div>
+
+    <div class="entry" style="--dot-color: var(--accent-blue)">
+      <div class="entry-date">Mar 4<br>2024</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-blue)">
+        <div class="card-header">
+          <span class="model-name">Claude 3 Family</span>
+          <span class="badge">Major Release</span>
+          <span class="badge milestone-badge">★ Opus · Sonnet · Haiku</span>
+        </div>
+        <p class="card-desc">A landmark release introducing three distinct model tiers for the first time: <strong>Opus</strong> (most capable), <strong>Sonnet</strong> (balanced), and <strong>Haiku</strong> (fastest & cheapest). Claude 3 Opus outperformed GPT-4 and Gemini Ultra on major benchmarks. All three models gained vision capabilities for the first time. The family also drew attention for demonstrating apparent awareness when being tested in "needle in a haystack" evaluations.</p>
+        <div class="tags"><span class="tag">3-tier family</span><span class="tag">Vision</span><span class="tag">200K context</span><span class="tag">New SOTA</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-teal)">
+      <div class="entry-date">Jun 20<br>2024</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-teal)">
+        <div class="card-header">
+          <span class="model-name">Claude 3.5 Sonnet</span>
+          <span class="badge milestone-badge">★ Artifacts Launch</span>
+        </div>
+        <p class="card-desc">A surprise release that upended the pricing model: a mid-tier model matching or exceeding the previous flagship Opus. Became widely regarded as the best coding model available. Launched alongside the new <em>Artifacts</em> feature, allowing Claude to generate code in a live side panel — a transformative UX shift.</p>
+        <div class="tags"><span class="tag">Beats Opus at Sonnet price</span><span class="tag">Artifacts</span><span class="tag">Best-in-class coding</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-teal)">
+      <div class="entry-date">Oct<br>2024</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-teal)">
+        <div class="card-header">
+          <span class="model-name">Claude 3.5 Sonnet v2</span>
+          <span class="badge milestone-badge">★ Computer Use</span>
+        </div>
+        <p class="card-desc">Updated 3.5 Sonnet release introducing <em>computer use</em> in beta — the first major AI model able to directly control a computer interface through cursor movement, clicking, and typing. Companies like Asana, Canva, and Replit immediately began building agentic tools around this capability.</p>
+        <div class="tags"><span class="tag">Computer use (beta)</span><span class="tag">GUI control</span><span class="tag">Agentic workflows</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-teal)">
+      <div class="entry-date">Nov<br>2024</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-teal)">
+        <div class="card-header">
+          <span class="model-name">Claude 3.5 Haiku</span>
+          <span class="badge">New</span>
+        </div>
+        <p class="card-desc">A significantly upgraded small model that surprised even Anthropic during testing — during final evals it surpassed Claude 3 Opus on many benchmarks at a fraction of the cost. Raised the bar for what a fast, affordable model could accomplish. Vision support was added in February 2025.</p>
+        <div class="tags"><span class="tag">Beats old Opus on benchmarks</span><span class="tag">Fast & cheap</span><span class="tag">200K context</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2025 -->
+  <div class="year-block">
+    <div class="year-label">2025</div>
+
+    <div class="entry" style="--dot-color: var(--accent-purple)">
+      <div class="entry-date">Feb 24<br>2025</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-purple)">
+        <div class="card-header">
+          <span class="model-name">Claude 3.7 Sonnet</span>
+          <span class="badge milestone-badge">★ Extended Thinking</span>
+        </div>
+        <p class="card-desc">Introduced hybrid reasoning: Claude could now pause and think step-by-step before responding, significantly improving performance on complex math, science, and multi-step code problems. Launched alongside the research preview of <em>Claude Code</em>, the agentic command-line coding tool.</p>
+        <div class="tags"><span class="tag">Extended thinking</span><span class="tag">Chain-of-thought</span><span class="tag">Claude Code preview</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-purple)">
+      <div class="entry-date">May 22<br>2025</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-purple)">
+        <div class="card-header">
+          <span class="model-name">Claude 4 · Sonnet 4</span>
+          <span class="badge milestone-badge">★ Claude Code GA</span>
+        </div>
+        <p class="card-desc">The Claude 4 generation launched with Sonnet 4 as the default model. Enhanced reasoning across coding, document analysis, and agentic tasks. Critically, Claude Code became generally available on this date — and reached $1B in annualized revenue within ~six months, faster than ChatGPT's early ramp.</p>
+        <div class="tags"><span class="tag">Enhanced reasoning</span><span class="tag">42% OSWorld</span><span class="tag">Claude Code GA</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-purple)">
+      <div class="entry-date">Aug<br>2025</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-purple)">
+        <div class="card-header">
+          <span class="model-name">Claude Opus 4.1</span>
+          <span class="badge">Update</span>
+        </div>
+        <p class="card-desc">An incremental but meaningful update to Claude 4 Opus with enhanced performance on complex reasoning, code generation, and long-document tasks. Became the primary model powering Claude Code for Pro and enterprise users handling demanding analysis work.</p>
+        <div class="tags"><span class="tag">Complex reasoning</span><span class="tag">Code generation</span><span class="tag">200K context</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-purple)">
+      <div class="entry-date">Sep<br>2025</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-purple)">
+        <div class="card-header">
+          <span class="model-name">Claude Sonnet 4.5</span>
+          <span class="badge milestone-badge">★ 77.2% SWE-bench</span>
+        </div>
+        <p class="card-desc">Achieved 77.2% on SWE-bench Verified — the highest score recorded at the time, earning the title "world's best coding model." Introduced extended 30+ hour focus windows for long agentic runs. Demonstrated 0% error rate in Replit's benchmarks.</p>
+        <div class="tags"><span class="tag">77.2% SWE-bench</span><span class="tag">30h+ focus</span><span class="tag">Agentic coding</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-purple)">
+      <div class="entry-date">Oct 15<br>2025</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-purple)">
+        <div class="card-header">
+          <span class="model-name">Claude Haiku 4.5</span>
+          <span class="badge">New</span>
+        </div>
+        <p class="card-desc">The fastest and most cost-efficient model in the 4.x generation, delivering near-frontier performance for real-time applications and high-volume processing. Matches Sonnet 4's performance on coding, computer use, and agent tasks at a much lower price point.</p>
+        <div class="tags"><span class="tag">Near-frontier speed</span><span class="tag">High-volume</span><span class="tag">Cost-efficient</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-purple)">
+      <div class="entry-date">Nov 24<br>2025</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-purple)">
+        <div class="card-header">
+          <span class="model-name">Claude Opus 4.5</span>
+          <span class="badge">New</span>
+        </div>
+        <p class="card-desc">A major step-change for the Opus tier: significantly improved on coding and workplace tasks including spreadsheet generation. Introduced <em>Infinite Chats</em> to eliminate context window limit errors. Came with a 67% price cut over older Opus pricing, making premium intelligence newly affordable.</p>
+        <div class="tags"><span class="tag">67% price cut</span><span class="tag">Infinite Chats</span><span class="tag">Coding & spreadsheets</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2026 -->
+  <div class="year-block">
+    <div class="year-label">2026</div>
+
+    <div class="entry" style="--dot-color: var(--accent-pink)">
+      <div class="entry-date">Feb 5<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-pink)">
+        <div class="card-header">
+          <span class="model-name">Claude Opus 4.6</span>
+          <span class="badge milestone-badge">★ Agent Teams · 1M context</span>
+        </div>
+        <p class="card-desc">Introduced native multi-agent coordination (Agent Teams) and a 1M token context window. Sets a new task-completion time horizon record as measured by METR: a 50%-success horizon of 14 hours 30 minutes. Launched with Claude in PowerPoint integration. Computer use accuracy reached 94% on insurance benchmarks.</p>
+        <div class="tags"><span class="tag">1M token context</span><span class="tag">Agent Teams</span><span class="tag">14.5h task horizon</span><span class="tag">Claude in PowerPoint</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: var(--accent-pink)">
+      <div class="entry-date">Feb 17<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card" style="--dot-color: var(--accent-pink)">
+        <div class="card-header">
+          <span class="model-name">Claude Sonnet 4.6</span>
+          <span class="badge">Latest Sonnet</span>
+          <span class="badge milestone-badge">★ Current</span>
+        </div>
+        <p class="card-desc">Full upgrade across coding, computer use, long-context reasoning, agent planning, knowledge work, and design. For the first time, a Sonnet model is preferred over the previous generation's Opus by the majority of developers in coding evaluations. Priced the same as Sonnet 4.5. 1M token context window in beta.</p>
+        <div class="tags"><span class="tag">94% computer use accuracy</span><span class="tag">Preferred over prev. Opus</span><span class="tag">1M context (beta)</span><span class="tag">$3/$15 per 1M tokens</span></div>
+      </div>
+    </div>
+
+    <div class="present-marker">Now · March 25, 2026</div>
+
+    <div class="spec-divider">Speculative · gut-feel only</div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Apr–May<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude Haiku 4.6</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">Haiku has reliably followed Sonnet by ~2 months every cycle. Expect the 4.6 speed tier to arrive here, bringing the 1M token context window and agent improvements to the cheapest price point.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><span class="conf-label">High confidence</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Jun<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude Sonnet 4.7</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">Incremental Sonnet bump, likely focused on agentic reliability and coding. Point releases within a generation have come every 2–3 months; a mid-year refresh fits the cadence.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium-high</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Jul<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude Opus 4.7</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">Opus tends to trail Sonnet by ~6 weeks. A summer Opus refresh would bring the flagship tier's capabilities up before the anticipated generation jump in autumn.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium-high</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Sep<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude Sonnet 4.8</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">A final end-of-summer push before the Claude 5 generation announcement. Could also be skipped entirely if Claude 5 lands early — this entry has the most uncertainty of the 4.x predictions.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Oct–Nov<br>2026</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude 5 Sonnet</span>
+          <span class="spec-label">~ Predicted</span>
+          <span class="spec-label">★ Gen Jump</span>
+        </div>
+        <p class="card-desc">The full Claude 5 generation — Anthropic has historically made a major autumn announcement. Expect meaningfully longer task horizons, deeper reasoning, and whatever the next breakthrough capability turns out to be (multimodal generation? real-time memory?).</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium-high (timing uncertain)</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 2027 -->
+  <div class="year-block">
+    <div class="year-label">2027 <span style="font-size:10px; color: #7dd3b0; letter-spacing: 0.1em;">— speculative</span></div>
+
+    <div class="spec-divider">Speculative · gut-feel only</div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Dec 2026–<br>Jan 2027</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude 5 Haiku</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">Holiday timing would make a fast, affordable Claude 5 tier very appealing for developers spinning up new products. Brings next-gen capability to high-volume and real-time workloads.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium-high</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Jan–Feb<br>2027</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude 5 Opus</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">The flagship Claude 5 tier. Likely showcases capabilities that feel qualitatively different — longer autonomous work sessions, better world-modeling, and improved tool use in complex multi-agent pipelines.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium-high</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Apr<br>2027</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude 5.5 Sonnet</span>
+          <span class="spec-label">~ Predicted</span>
+          <span class="spec-label">★ "Better than prev Opus"</span>
+        </div>
+        <p class="card-desc">If history repeats, the x.5 Sonnet is often the most impactful release of a cycle — Claude 3.5 Sonnet was the moment the community declared it the best model available. Expect a similar moment with 5.5 Sonnet surpassing Opus 5 on coding and everyday tasks.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Jun<br>2027</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude 5.5 Haiku</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">The fast tier catches up to 5.5 capabilities. At this point in the cycle, Haiku models have consistently punched above their weight — this one may well match Opus 5 on many benchmarks.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium</span></div>
+      </div>
+    </div>
+
+    <div class="entry" style="--dot-color: #7dd3b0">
+      <div class="entry-date">Aug<br>2027</div>
+      <div class="entry-line"><div class="entry-dot"></div><div class="entry-connector"></div></div>
+      <div class="card speculative">
+        <div class="card-header">
+          <span class="model-name">Claude 5.5 Opus</span>
+          <span class="spec-label">~ Predicted</span>
+        </div>
+        <p class="card-desc">Completes the 5.5 family. By this point the Claude 5 generation will have been out for ~10 months — a full Opus upgrade sets the stage for the Claude 6 cycle. The industry pace may accelerate all of this significantly.</p>
+        <div class="confidence"><div class="conf-dot filled"></div><div class="conf-dot filled"></div><div class="conf-dot"></div><div class="conf-dot"></div><div class="conf-dot"></div><span class="conf-label">Medium (speculation compounds)</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <span>Sources: Anthropic · Wikipedia · platform.claude.com</span>
+    <span>Updated March 25, 2026</span>
+  </footer>
+
+</div>
+
+<script>
+  const entries = document.querySelectorAll('.entry');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('visible'), i * 60);
+      }
+    });
+  }, { threshold: 0.1 });
+  entries.forEach(e => observer.observe(e));
+</script>
+</body>
+</html>
